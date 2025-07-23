@@ -96,6 +96,3 @@ Swagger UI будет доступен по адресу:
 ## 🛠 Авторы
 
 * [@FedkinDmitriy](https://github.com/FedkinDmitriy)
-
-```
-
