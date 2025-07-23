@@ -1,4 +1,5 @@
-﻿using Data.Models;
+﻿using Data.DTO;
+using Data.Models;
 using Data.Repositories.Interfaces;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -31,10 +32,28 @@ namespace WebApp.Controllers
 
         // GET api/<ClientsController>/5
         [HttpGet("{id}")]
-        public async Task<Results<Ok<Client>,NotFound>> Get(int id, CancellationToken cancellationToken)
+        public async Task<Results<Ok<ClientDTO>,NotFound>> Get(int id, CancellationToken cancellationToken)
         {
-            Client? client = await _clients.GetByIdAsync(id, cancellationToken);
-            return client is not null ? TypedResults.Ok(client) : TypedResults.NotFound();
+
+            var client = await _clients.GetByIdAsync(id, cancellationToken);
+            if (client is null) return TypedResults.NotFound();
+
+            var dto = new ClientDTO
+            {
+                Id = client.Id,
+                FirstName = client.FirstName,
+                LastName = client.LastName,
+                DateOfBirth = client.DateOfBirth,
+                Orders = client.Orders.Select(order => new OrderDTO
+                {
+                    Id = order.Id,
+                    OrderSum = order.OrderSum,
+                    OrdersDateTime = order.OrdersDateTime,
+                    Status = order.Status.ToString()
+                }).ToList()
+            };
+
+            return TypedResults.Ok(dto);
         }
 
         // POST api/<ClientsController>
