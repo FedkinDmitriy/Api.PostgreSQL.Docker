@@ -1,4 +1,5 @@
-﻿using Data.Models;
+﻿using Data.DTO;
+using Data.Models;
 using Data.Repositories.Interfaces;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -26,10 +27,14 @@ namespace WebApp.Controllers
 
         // GET api/<OrdersController>/5
         [HttpGet("{id}")]
-        public async Task<Results<Ok<Order>, NotFound>> Get(int id, CancellationToken cancellationToken)
+        public async Task<Results<Ok<OrderDTO>, NotFound>> Get(int id, CancellationToken cancellationToken)
         {
-            Order? order = await _orders.GetByIdAsync(id, cancellationToken);
-            return order is not null ? TypedResults.Ok(order) : TypedResults.NotFound();
+            var order = await _orders.GetByIdAsync(id, cancellationToken);
+            if (order is null) return TypedResults.NotFound();
+
+            var dto = new OrderDTO { Id = order.Id, OrdersDateTime = order.OrdersDateTime, OrderSum = order.OrderSum, Status = order.Status.ToString() };
+
+            return TypedResults.Ok(dto);
         }
 
         // POST api/<OrdersController>
