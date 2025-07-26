@@ -1,4 +1,4 @@
-# Api.Postgress.Docker
+# Api.PostgreSQL.Docker
 # Web API для управления клиентами и заказами
 
 Этот проект представляет собой ASP.NET Core Web API для управления клиентами и их заказами. В проекте используются:
