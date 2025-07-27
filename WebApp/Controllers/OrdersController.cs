@@ -19,59 +19,84 @@ namespace WebApp.Controllers
 
         // GET: api/<OrdersController>
         [HttpGet]
-        public async Task<Results<Ok<IReadOnlyList<Order>>, NoContent>> Get(CancellationToken cancellationToken)
+        [ProducesResponseType(typeof(IReadOnlyList<Order>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        public async Task<ActionResult<IReadOnlyList<Order>>> Get(CancellationToken cancellationToken)
         {
             var orders = await _orders.GetAllAsync(cancellationToken);
-            return orders.Count > 0 ? TypedResults.Ok(orders) : TypedResults.NoContent();
+            return orders.Count > 0 ? Ok(orders) : NoContent();
         }
 
         // GET api/<OrdersController>/5
         [HttpGet("{id}")]
-        public async Task<Results<Ok<OrderDTO>, NotFound>> Get(int id, CancellationToken cancellationToken)
+        [ProducesResponseType(typeof(OrderDTO), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<OrderDTO>> Get(int id, CancellationToken cancellationToken)
         {
             var order = await _orders.GetByIdAsync(id, cancellationToken);
-            if (order is null) return TypedResults.NotFound();
+            if (order is null) return NotFound();
 
             var dto = new OrderDTO { Id = order.Id, OrdersDateTime = order.OrdersDateTime, OrderSum = order.OrderSum, Status = order.Status.ToString() };
 
-            return TypedResults.Ok(dto);
+            return Ok(dto);
         }
 
         // POST api/<OrdersController>
         [HttpPost]
-        public async Task<Results<Created<Order>, BadRequest>> Post([FromBody] Order order, CancellationToken cancellationToken)
+        [ProducesResponseType(typeof(Order), StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Order>> Post([FromBody] Order order, CancellationToken cancellationToken)
         {
-            if (order == null) return TypedResults.BadRequest();
+            if (order == null) return BadRequest();
 
             await _orders.AddAsync(order, cancellationToken);
 
-            return TypedResults.Created($"/api/orders/{order.Id}", order);
+            //return TypedResults.Created($"/api/orders/{order.Id}", order);
+            return CreatedAtAction(nameof(Get), new { id = order.Id }, order);
         }
 
         // PUT api/<OrdersController>
-        [HttpPut]
-        public async Task<Results<NoContent, BadRequest>> Put([FromBody] Order order, CancellationToken cancellationToken)
+        [HttpPut("{id}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult> Put(int id, [FromBody] Order order, CancellationToken cancellationToken)
         {
-            if (order == null) return TypedResults.BadRequest();
+            // 1. Проверка валидации модели
+            if (!ModelState.IsValid)
+                return ValidationProblem(ModelState);
+
+            // 2. Проверка соответствия ID в пути и теле
+            if (order == null || order.Id != id)
+                return BadRequest("ID в пути и теле запроса не совпадают");
+
+            if (order == null) return NotFound();
 
             await _orders.UpdateAsync(order, cancellationToken);
 
-            return TypedResults.NoContent();
+            return NoContent();
         }
 
         // DELETE api/<OrdersController>/5
         [HttpDelete("{id}")]
-        public async Task<Results<NoContent, NotFound>> Delete(int id, CancellationToken cancellationToken)
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult> Delete(int id, CancellationToken cancellationToken)
         {
+            // Валидация ID
+            if (id <= 0)
+                return BadRequest("ID должен быть положительным числом");
+
             Order? order = await _orders.GetByIdAsync(id, cancellationToken);
             if (order is not null)
             {
                 await _orders.DeleteAsync(id, cancellationToken);
-                return TypedResults.NoContent();
+                return NoContent();
             }
             else
             {
-                return TypedResults.NotFound();
+                return NotFound();
             }
         }
     }

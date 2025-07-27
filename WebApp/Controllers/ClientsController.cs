@@ -24,19 +24,24 @@ namespace WebApp.Controllers
 
         // GET: api/<ClientsController>
         [HttpGet]
-        public async Task<Results<Ok<IReadOnlyList<Client>>,NoContent>> Get(CancellationToken cancellationToken)
+        [ProducesResponseType(typeof(IReadOnlyList<Client>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        public async Task<ActionResult<IReadOnlyList<Client>>> Get(CancellationToken cancellationToken)
         {
             var clients = await _clients.GetAllAsync(cancellationToken);
-            return clients.Count > 0 ? TypedResults.Ok(clients) : TypedResults.NoContent();
+
+            return clients.Count > 0 ? Ok(clients) : NoContent();
         }
+
 
         // GET api/<ClientsController>/5
         [HttpGet("{id}")]
-        public async Task<Results<Ok<ClientDTO>,NotFound>> Get(int id, CancellationToken cancellationToken)
+        [ProducesResponseType(typeof(ClientDTO), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<ClientDTO>> Get(int id, CancellationToken cancellationToken)
         {
-
             var client = await _clients.GetByIdAsync(id, cancellationToken);
-            if (client is null) return TypedResults.NotFound();
+            if (client is null) return NotFound();
 
             var dto = new ClientDTO
             {
@@ -44,54 +49,77 @@ namespace WebApp.Controllers
                 FirstName = client.FirstName,
                 LastName = client.LastName,
                 DateOfBirth = client.DateOfBirth,
-                Orders = client.Orders.Select(order => new OrderDTO
+                Orders = client.Orders?.Select(order => new OrderDTO
                 {
                     Id = order.Id,
                     OrderSum = order.OrderSum,
                     OrdersDateTime = order.OrdersDateTime,
                     Status = order.Status.ToString()
-                }).ToList()
+                }).ToList() ?? new List<OrderDTO>()
             };
-
-            return TypedResults.Ok(dto);
+            return Ok(dto);
         }
 
         // POST api/<ClientsController>
         [HttpPost]
-        public async Task<Results<Created<Client>,BadRequest>> Post([FromBody] Client client, CancellationToken cancellationToken)
+        [ProducesResponseType(typeof(Client), StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Client>> Post([FromBody] Client client, CancellationToken cancellationToken)
         {
-            if (client == null) return TypedResults.BadRequest();
+            if (client == null) return BadRequest();
 
             await _clients.AddAsync(client, cancellationToken);
 
-            return TypedResults.Created($"/api/clients/{client.Id}", client);
+            //return Created($"/api/clients/{client.Id}", client);
+            return CreatedAtAction(nameof(Get),new { id = client.Id },client);
         }
 
         // PUT api/<ClientsController>
-        [HttpPut]
-        public async Task<Results<NoContent,BadRequest>> Put([FromBody] Client client, CancellationToken cancellationToken)
+        [HttpPut("{id}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult> Put(int id,[FromBody] Client client,CancellationToken cancellationToken)
         {
-            if (client == null) return TypedResults.BadRequest();
+            // 1. Проверка валидации модели
+            if (!ModelState.IsValid)
+                return ValidationProblem(ModelState);
 
+            // 2. Проверка соответствия ID в пути и теле
+            if (client == null || client.Id != id)
+                return BadRequest("ID в пути и теле запроса не совпадают");
+
+            // 3. Проверка существования клиента
+            var existingClient = await _clients.GetByIdAsync(id, cancellationToken);
+            if (existingClient == null)
+                return NotFound();
+
+            // 4. Обновление
             await _clients.UpdateAsync(client, cancellationToken);
 
-            return TypedResults.NoContent();
+            return NoContent();
         }
 
         // DELETE api/<ClientsController>/5
+
         [HttpDelete("{id}")]
-        public async Task<Results<NoContent, NotFound>> Delete(int id, CancellationToken cancellationToken)
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult> Delete(int id, CancellationToken cancellationToken)
         {
+            // Валидация ID
+            if (id <= 0)
+                return BadRequest("ID должен быть положительным числом");
+
+            // Проверка существования клиента
             Client? client = await _clients.GetByIdAsync(id, cancellationToken);
-            if(client is not null)
-            {
-                await _clients.DeleteAsync(id, cancellationToken);
-                return TypedResults.NoContent();
-            }
-            else
-            {
-                return TypedResults.NotFound();
-            }
+            if (client is null)
+                return NotFound();
+
+            // Удаление
+            await _clients.DeleteAsync(id, cancellationToken);
+            return NoContent();
         }
     }
 }
